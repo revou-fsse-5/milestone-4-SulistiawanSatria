@@ -1,25 +1,26 @@
-# Use Python 3.9 slim image
+# Gunakan image Python sebagai dasar
 FROM python:3.9-slim
 
-# Set working directory
+# Tentukan direktori kerja di dalam container
 WORKDIR /app
 
-# Copy requirements first for better caching
+# Install dependencies yang dibutuhkan oleh mysqlclient
+RUN apt-get update && apt-get install -y \
+    default-libmysqlclient-dev \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Salin file requirements.txt ke dalam container
 COPY requirements.txt .
 
-# Install dependencies
+# Install dependencies dari requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
+# Salin seluruh proyek ke dalam direktori kerja
 COPY . .
 
-# Set environment variables
-ENV FLASK_APP=app
-ENV FLASK_ENV=production
-ENV PORT=8080
+# Tentukan port yang akan diekspos
+EXPOSE 8000
 
-# Expose port
-EXPOSE 8080
-
-# Run gunicorn
-CMD gunicorn --bind 0.0.0.0:$PORT "app:create_app()"
+# Tentukan command untuk menjalankan aplikasi
+CMD ["flask", "run", "--host=0.0.0.0", "--port=8000"]

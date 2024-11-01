@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}500 - Internal Server Error{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+        <h1 class="text-6xl font-bold text-red-500 mb-4">500</h1>
+        <h2 class="text-2xl font-semibold text-gray-800 mb-4">Internal Server Error</h2>
+        <p class="text-gray-600 mb-6">{{ error if error else "Something went wrong on our end. We're working to fix it." }}</p>
+        <div class="flex flex-col items-center gap-4">
+            <a href="{{ url_for('index') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                Back to Home
+            </a>
+            <button onclick="window.location.reload()" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                Try Again
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}

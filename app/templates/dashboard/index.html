@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Modern Bank{% endblock %}
+
+{% block main_content %}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate__animated animate__fadeIn">
+    <!-- Total Balance Card -->
+    <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg transform hover:scale-105 transition-transform duration-200">
+        <div class="flex justify-between items-center">
+            <h3 class="text-lg font-semibold">Total Balance</h3>
+            <div class="bg-white/20 rounded-full p-2">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
+                    <path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd" />
+                </svg>
+            </div>
+        </div>
+        <p class="text-2xl font-bold mt-2">${{ "{:,.2f}".format(total_balance) }}</p>
+        <p class="text-sm opacity-80">Across {{ account_count }} accounts</p>
+    </div>
+
+    <!-- Monthly Income Card -->
+    <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg transform hover:scale-105 transition-transform duration-200">
+        <div class="flex justify-between items-center">
+            <h3 class="text-lg font-semibold">Monthly Income</h3>
+            <div class="bg-white/20 rounded-full p-2">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clip-rule="evenodd" />
+                </svg>
+            </div>
+        </div>
+        <p class="text-2xl font-bold mt-2">${{ "{:,.2f}".format(monthly_income) }}</p>
+        <p class="text-sm opacity-80">This month</p>
+    </div>
+
+    <!-- Monthly Expenses Card -->
+    <div class="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-lg transform hover:scale-105 transition-transform duration-200">
+        <div class="flex justify-between items-center">
+            <h3 class="text-lg font-semibold">Monthly Expenses</h3>
+            <div class="bg-white/20 rounded-full p-2">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+            </div>
+        </div>
+        <p class="text-2xl font-bold mt-2">${{ "{:,.2f}".format(monthly_expenses) }}</p>
+        <p class="text-sm opacity-80">This month</p>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <!-- Spending by Category -->
+    <div class="bg-white rounded-xl shadow-lg p-6 animate__animated animate__fadeIn">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Spending by Category</h3>
+        <div class="relative h-[300px] flex items-center justify-center text-gray-500">
+            Coming Soon
+        </div>
+    </div>
+
+    <!-- Monthly Overview -->
+    <div class="bg-white rounded-xl shadow-lg p-6 animate__animated animate__fadeIn">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Monthly Overview</h3>
+        <div class="relative h-[300px] flex items-center justify-center text-gray-500">
+            Coming Soon
+        </div>
+    </div>
+</div>
+
+<!-- Recent Transactions -->
+<div class="bg-white rounded-xl shadow-lg mb-8 animate__animated animate__fadeIn">
+    <div class="p-6 border-b border-gray-200">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <h2 class="text-xl font-semibold text-gray-800">Recent Transactions</h2>
+            <div class="flex gap-4">
+                <select class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option>All Categories</option>
+                    {% for category in categories %}
+                        <option>{{ category.name }}</option>
+                    {% endfor %}
+                </select>
+                <button class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                    Export Data
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% if recent_transactions %}
+                    {% for transaction in recent_transactions %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ transaction.created_at.strftime('%Y-%m-%d') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {{ transaction.description }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                ${{ "{:,.2f}".format(transaction.amount) }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    {% if transaction.status == 'completed' %}
+                                        bg-green-100 text-green-800
+                                    {% elif transaction.status == 'pending' %}
+                                        bg-yellow-100 text-yellow-800
+                                    {% else %}
+                                        bg-red-100 text-red-800
+                                    {% endif %}">
+                                    {{ transaction.status }}
+                                </span>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">
+                            No transactions found
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+<!-- Transaction button -->
+<a href="{{ url_for('transactions.create_transaction') }}" class="btn btn-primary">
+    Create Transaction
+</a>

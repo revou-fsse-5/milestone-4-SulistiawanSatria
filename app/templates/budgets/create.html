@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Create Budget - Modern Bank{% endblock %}
+
+{% block main_content %}
+<div class="max-w-md mx-auto bg-white rounded-lg shadow p-6">
+    <h2 class="text-2xl font-bold mb-6">Create New Budget</h2>
+    
+    <form method="POST" action="{{ url_for('budgets.create_budget') }}">
+        <!-- Form content remains the same, just updated action URL -->
+    </form>
+</div>
+{% endblock %}

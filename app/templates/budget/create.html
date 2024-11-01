@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Create Budget - Modern Bank{% endblock %}
+
+{% block main_content %}
+<div class="max-w-md mx-auto bg-white rounded-lg shadow p-6">
+    <h2 class="text-2xl font-bold mb-6">Create New Budget</h2>
+    
+    <form method="POST">
+        <!-- Category Selection -->
+        <div class="mb-4">
+            <label class="block text-gray-700 text-sm font-bold mb-2" for="category">
+                Category
+            </label>
+            <select class="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                    id="category" name="category" required>
+                <option value="">Select a category</option>
+                <option value="groceries">Groceries</option>
+                <option value="transportation">Transportation</option>
+                <option value="utilities">Utilities</option>
+                <option value="entertainment">Entertainment</option>
+                <option value="shopping">Shopping</option>
+                <option value="healthcare">Healthcare</option>
+                <option value="other">Other</option>
+            </select>
+        </div>
+
+        <!-- Custom Category (if "Other" is selected) -->
+        <div class="mb-4 hidden" id="custom-category-div">
+            <label class="block text-gray-700 text-sm font-bold mb-2" for="custom_category">
+                Custom Category Name
+            </label>
+            <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                   id="custom_category" name="custom_category" type="text">
+        </div>
+
+        <!-- Budget Amount -->
+        <div class="mb-4">
+            <label class="block text-gray-700 text-sm font-bold mb-2" for="amount">
+                Monthly Budget Amount
+            </label>
+            <div class="relative">
+                <span class="absolute left-3 top-2 text-gray-600">$</span>
+                <input class="shadow appearance-none border rounded w-full py-2 pl-8 pr-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                       id="amount" name="amount" type="number" min="0" step="0.01" required>
+            </div>
+        </div>
+
+        <!-- Budget Period -->
+        <div class="mb-6">
+            <label class="block text-gray-700 text-sm font-bold mb-2" for="period">
+                Budget Period
+            </label>
+            <select class="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                    id="period" name="period" required>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="yearly">Yearly</option>
+            </select>
+        </div>
+
+        <!-- Start Date -->
+        <div class="mb-6">
+            <label class="block text-gray-700 text-sm font-bold mb-2" for="start_date">
+                Start Date
+            </label>
+            <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                   id="start_date" name="start_date" type="date" required>
+        </div>
+
+        <!-- Notification Settings -->
+        <div class="mb-6">
+            <label class="block text-gray-700 text-sm font-bold mb-2">
+                Notification Settings
+            </label>
+            <div class="space-y-2">
+                <label class="flex items-center">
+                    <input type="checkbox" name="notifications[]" value="threshold" class="mr-2">
+                    <span>Alert when spending reaches 80% of budget</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" name="notifications[]" value="weekly" class="mr-2">
+                    <span>Weekly spending summary</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" name="notifications[]" value="monthly" class="mr-2">
+                    <span>Monthly budget report</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="flex items-center justify-between">
+            <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                    type="submit">
+                Create Budget
+            </button>
+            <a href="{{ url_for('budget.list') }}" class="text-blue-500 hover:text-blue-800">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+{% block extra_js %}
+<script>
+    // Show/hide custom category field based on selection
+    document.getElementById('category').addEventListener('change', function() {
+        const customCategoryDiv = document.getElementById('custom-category-div');
+        if (this.value === 'other') {
+            customCategoryDiv.classList.remove('hidden');
+        } else {
+            customCategoryDiv.classList.add('hidden');
+        }
+    });
+</script>
+{% endblock %}
+{% endblock %}

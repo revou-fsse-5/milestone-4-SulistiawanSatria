@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Bank Documentation</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .endpoint {
+            border-left: 4px solid #3B82F6;
+            margin-bottom: 1rem;
+            padding-left: 1rem;
+        }
+        .method-get { color: #10B981; }
+        .method-post { color: #3B82F6; }
+        .method-put { color: #F59E0B; }
+        .method-delete { color: #EF4444; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <nav class="bg-blue-600 text-white p-4">
+        <div class="container mx-auto">
+            <h1 class="text-2xl font-bold">Modern Bank</h1>
+        </div>
+    </nav>
+
+    <main class="container mx-auto mt-8 p-4">
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-2xl font-bold mb-6">API Documentation</h2>
+
+            <!-- Authentication -->
+            <section class="mb-8">
+                <h3 class="text-xl font-semibold mb-4">Authentication</h3>
+                
+                <div class="endpoint">
+                    <h4 class="font-bold"><span class="method-post">POST</span> /auth/register</h4>
+                    <p class="text-gray-600 mb-2">Register new user account</p>
+                    <pre class="bg-gray-100 p-2 rounded">
+{
+    "username": "string",
+    "email": "string",
+    "password": "string"
+}</pre>
+                </div>
+
+                <div class="endpoint">
+                    <h4 class="font-bold"><span class="method-post">POST</span> /auth/login</h4>
+                    <p class="text-gray-600 mb-2">Login to existing account</p>
+                    <pre class="bg-gray-100 p-2 rounded">
+{
+    "username": "string",
+    "password": "string"
+}</pre>
+                </div>
+            </section>
+
+            <!-- Account Management -->
+            <section class="mb-8">
+                <h3 class="text-xl font-semibold mb-4">Account Management</h3>
+                
+                <div class="endpoint">
+                    <h4 class="font-bold"><span class="method-get">GET</span> /accounts</h4>
+                    <p class="text-gray-600">Get list of all accounts</p>
+                </div>
+
+                <div class="endpoint">
+                    <h4 class="font-bold"><span class="method-post">POST</span> /accounts</h4>
+                    <p class="text-gray-600 mb-2">Create new bank account</p>
+                    <pre class="bg-gray-100 p-2 rounded">
+{
+    "account_type": "string",
+    "initial_balance": "number"
+}</pre>
+                </div>
+
+                <div class="endpoint">
+                    <h4 class="font-bold"><span class="method-get">GET</span> /accounts/{id}</h4>
+                    <p class="text-gray-600">Get specific account details</p>
+                </div>
+            </section>
+
+            <!-- Transaction Management -->
+            <section class="mb-8">
+                <h3 class="text-xl font-semibold mb-4">Transaction Management</h3>
+                
+                <div class="endpoint">
+                    <h4 class="font-bold"><span class="method-post">POST</span> /transactions</h4>
+                    <p class="text-gray-600 mb-2">Create new transaction</p>
+                    <pre class="bg-gray-100 p-2 rounded">
+{
+    "from_account_id": "number",
+    "to_account_id": "number",
+    "amount": "number",
+    "type": "string",
+    "description": "string"
+}</pre>
+                </div>
+
+                <div class="endpoint">
+                    <h4 class="font-bold"><span class="method-get">GET</span> /transactions</h4>
+                    <p class="text-gray-600">Get list of all transactions</p>
+                </div>
+            </section>
+
+            <!-- Budgeting -->
+            <section class="mb-8">
+                <h3 class="text-xl font-semibold mb-4">Budget Management</h3>
+                
+                <div class="endpoint">
+                    <h4 class="font-bold"><span class="method-post">POST</span> /budgets</h4>
+                    <p class="text-gray-600 mb-2">Create new budget</p>
+                    <pre class="bg-gray-100 p-2 rounded">
+{
+    "category": "string",
+    "amount": "number",
+    "period": "string"
+}</pre>
+                </div>
+
+                <div class="endpoint">
+                    <h4 class="font-bold"><span class="method-get">GET</span> /budgets</h4>
+                    <p class="text-gray-600">Get list of all budgets</p>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="bg-gray-800 text-white p-4 mt-8">
+        <div class="container mx-auto text-center">
+            <p>&copy; 2024 Modern Bank. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>

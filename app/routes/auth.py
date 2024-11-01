@@ -1,6 +1,6 @@
-from flask import Blueprint, request, jsonify, render_template, redirect, url_for, make_response, flash, current_app
+from flask import Blueprint, request, jsonify, render_template, redirect, url_for, make_response, flash
 from flask_jwt_extended import create_access_token, verify_jwt_in_request, get_jwt_identity
-from werkzeug.security import check_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 from app.models.user import User
 from datetime import timedelta
 from flask_wtf import FlaskForm
@@ -9,10 +9,7 @@ from wtforms.validators import DataRequired, Email, Length, ValidationError
 from app import db
 import logging
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 class LoginForm(FlaskForm):
@@ -32,18 +29,40 @@ class RegistrationForm(FlaskForm):
         if User.query.filter_by(username=field.data).first():
             raise ValidationError('Username already taken.')
 
+@auth_bp.route('/register', methods=['GET', 'POST'])
+def register_page():
+    form = RegistrationForm()
+    
+    if request.method == 'POST' and form.validate_on_submit():
+        try:
+            user = User(
+                username=form.username.data,
+                email=form.email.data,
+                password=form.password.data
+            )
+            db.session.add(user)
+            db.session.commit()
+            
+            flash('Registration successful!', 'success')
+            return redirect(url_for('auth.login_page'))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Register error: {str(e)}")
+            flash('Registration failed', 'error')
+            
+    return render_template('auth/register.html', form=form)
+
+
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login_page():
     form = LoginForm()
     
-    if request.method == 'GET':
-        return render_template('auth/login.html', form=form)
-    
-    if form.validate_on_submit():
+    if request.method == 'POST' and form.validate_on_submit():
         try:
             user = User.query.filter_by(email=form.email.data).first()
             
-            if user and check_password_hash(user.password_hash, form.password.data):
+            if user and user.check_password(form.password.data):
                 access_token = create_access_token(
                     identity=user.id,
                     expires_delta=timedelta(hours=1)
@@ -61,68 +80,21 @@ def login_page():
                 
                 flash('Login successful!', 'success')
                 return response
-            
+                
             flash('Invalid email or password', 'error')
-            return redirect(url_for('auth.login_page'))
-
+            
         except Exception as e:
             logger.error(f"Login error: {str(e)}")
-            flash('An error occurred during login', 'error')
-            return redirect(url_for('auth.login_page'))
-
-    # Tambahkan return statement di sini
+            flash('Login failed', 'error')
+            
     return render_template('auth/login.html', form=form)
 
-
-@auth_bp.route('/register', methods=['GET', 'POST'])
-def register_page():
-    if request.method == 'GET':
-        try:
-            verify_jwt_in_request()
-            return redirect(url_for('dashboard.index'))
-        except:
-            form = RegistrationForm()
-            return render_template('auth/register.html', form=form)
-
-    form = RegistrationForm()
-    if form.validate_on_submit():
-        try:
-            user = User(
-                username=form.username.data,
-                email=form.email.data,
-                password=form.password.data
-            )
-            
-            db.session.add(user)
-            db.session.commit()
-
-            logger.info(f"New user registered: {form.email.data}")
-            flash('Registration successful! Please login.', 'success')
-            return redirect(url_for('auth.login_page'))
-
-        except Exception as e:
-            logger.error(f"Register error: {str(e)}")
-            db.session.rollback()
-            flash('An error occurred during registration', 'error')
-            return render_template('auth/register.html', form=form)
-    
-    for field, errors in form.errors.items():
-        for error in errors:
-            flash(f"{field.title()}: {error}", 'error')
-    
-    return render_template('auth/register.html', form=form)
-
-@auth_bp.route('/logout', methods=['POST', 'GET'])
+@auth_bp.route('/logout')
 def logout():
-    try:
-        response = make_response(redirect(url_for('auth.login_page')))
-        response.delete_cookie('access_token_cookie')
-        flash('Successfully logged out', 'success')
-        return response
-    except Exception as e:
-        logger.error(f"Logout error: {str(e)}")
-        flash('Error during logout', 'error')
-        return redirect(url_for('auth.login_page'))
+    response = make_response(redirect(url_for('auth.login_page')))
+    response.delete_cookie('access_token_cookie')
+    flash('Successfully logged out', 'success')
+    return response
 
 @auth_bp.route('/verify-token', methods=['POST'])
 def verify_token():
@@ -130,24 +102,23 @@ def verify_token():
         verify_jwt_in_request()
         current_user_id = get_jwt_identity()
         
-        with current_app.app_context():
-            user = User.query.get(current_user_id)
-            if not user:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'Invalid token'
-                }), 401
-                
+        user = User.query.get(current_user_id)
+        if not user:
             return jsonify({
-                'status': 'success',
-                'data': {
-                    'user': {
-                        'id': user.id,
-                        'email': user.email,
-                        'username': user.username
-                    }
+                'status': 'error',
+                'message': 'Invalid token'
+            }), 401
+            
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'username': user.username
                 }
-            }), 200
+            }
+        }), 200
             
     except Exception as e:
         logger.error(f"Token verification error: {str(e)}")

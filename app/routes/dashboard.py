@@ -12,14 +12,12 @@ from datetime import datetime, timedelta
 import logging
 import json
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
 def format_transaction_data(transaction, include_accounts=True):
-    """Helper function to format transaction data"""
     try:
         from_account = Account.query.get(transaction.from_account_id) if transaction.from_account_id else None
         to_account = Account.query.get(transaction.to_account_id) if transaction.to_account_id else None
@@ -50,17 +48,9 @@ def format_transaction_data(transaction, include_accounts=True):
         logger.error(f"Error formatting transaction data: {str(e)}")
         return None
 
-@dashboard_bp.before_request
-def verify_auth():
-    try:
-        verify_jwt_in_request()
-        return None
-    except:
-        return redirect(url_for('auth.login_page'))
-
-
 @dashboard_bp.route('/')
 @dashboard_bp.route('/dashboard')
+@jwt_required()
 def index():
     try:
         current_user_id = get_jwt_identity()
@@ -82,14 +72,12 @@ def index():
             'budgets': []
         }
 
-        # Get accounts
         accounts = Account.query.filter_by(user_id=current_user_id).all()
         if accounts:
             template_data['accounts'] = accounts
             template_data['account_count'] = len(accounts)
             template_data['total_balance'] = sum(float(account.balance) for account in accounts)
 
-        # Get recent transactions
         account_ids = [account.id for account in accounts]
         if account_ids:
             transactions = Transaction.query.filter(
@@ -102,9 +90,9 @@ def index():
         return render_template('dashboard/index.html', **template_data)
 
     except Exception as e:
-            logger.error(f"Dashboard error: {str(e)}")
-    flash('Error loading dashboard', 'error')
-    return redirect(url_for('auth.login_page'))
+        logger.error(f"Dashboard error: {str(e)}")
+        flash('Error loading dashboard', 'error')
+        return redirect(url_for('auth.login_page'))
 
 @dashboard_bp.route('/dashboard/account/<int:account_id>')
 @jwt_required()
@@ -165,7 +153,6 @@ def analytics():
         flash('Error generating analytics', 'error')
         return redirect(url_for('dashboard.index'))
 
-# Error handlers
 @dashboard_bp.errorhandler(404)
 def not_found_error(error):
     logger.warning(f"404 error: {str(error)}")

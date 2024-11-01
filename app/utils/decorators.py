@@ -11,9 +11,11 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
         try:
             verify_jwt_in_request()
+            current_user_id = get_jwt_identity()
+            if not current_user_id:
+                return redirect(url_for('auth.login_page'))
             return f(*args, **kwargs)
-        except Exception as e:
-            logger.warning(f"Authentication failed: {str(e)}")
+        except:
             if request.is_json:
                 return jsonify({
                     'status': 'error',
@@ -21,6 +23,7 @@ def login_required(f):
                 }), 401
             return redirect(url_for('auth.login_page'))
     return decorated_function
+
 
 def check_account_ownership(f):
     @wraps(f)

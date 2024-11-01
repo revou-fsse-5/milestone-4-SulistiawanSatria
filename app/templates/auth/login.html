@@ -43,7 +43,7 @@
             {% endif %}
         {% endwith %}
 
-        <form class="mt-8 space-y-6" action="{{ url_for('auth.login_page') }}" method="POST">
+        <form class="mt-8 space-y-6" id="loginForm">
             {{ form.csrf_token }}
             <div class="rounded-md shadow-sm -space-y-px">
                 <div>
@@ -101,19 +101,52 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.querySelector('form');
+    const form = document.getElementById('loginForm');
     const errorMessage = document.getElementById('errorMessage');
 
     form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
 
         if (!email || !password) {
-            e.preventDefault();
             errorMessage.textContent = 'Please fill in all fields';
             errorMessage.classList.remove('hidden');
             return;
         }
+
+        const formData = new FormData(form);
+
+        fetch('{{ url_for("auth.login_page") }}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            if (response.redirected) {
+                window.location.href = response.url;
+                return;
+            }
+            
+            if (response.headers.get('content-type')?.includes('application/json')) {
+                return response.json().then(data => {
+                    if (data.status === 'error') {
+                        throw new Error(data.message);
+                    }
+                    window.location.href = data.redirect || '{{ url_for("dashboard.index") }}';
+                });
+            } else {
+                window.location.href = '{{ url_for("dashboard.index") }}';
+            }
+        })
+        .catch(error => {
+            errorMessage.textContent = error.message || 'An error occurred during login';
+            errorMessage.classList.remove('hidden');
+        });
     });
 });
 </script>

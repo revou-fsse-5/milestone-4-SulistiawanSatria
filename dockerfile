@@ -24,3 +24,4 @@ EXPOSE 8000
 
 # Tentukan command untuk menjalankan aplikasi
 CMD ["flask", "run", "--host=0.0.0.0", "--port=8000"]
+

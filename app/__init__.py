@@ -25,27 +25,39 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def create_app():
-    app = Flask(__name__, template_folder='templates')
+    app = Flask(__name__)
     
-    # Configuration
+    # Basic Configuration
     app.config.update(
         SECRET_KEY=os.getenv('SECRET_KEY', 'dev-secret-key'),
         JWT_SECRET_KEY=os.getenv('JWT_SECRET_KEY', 'dev-jwt-secret'),
         SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL', 'sqlite:///app.db'),
-        ENV=os.getenv('FLASK_ENV', 'development'),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        
+        # JWT Configuration
         JWT_ACCESS_TOKEN_EXPIRES=timedelta(hours=1),
-        JWT_TOKEN_LOCATION=['headers', 'cookies'],
-        JWT_COOKIE_CSRF_PROTECT=False,
-        JWT_HEADER_NAME='Authorization',
-        JWT_HEADER_TYPE='Bearer',
+        JWT_TOKEN_LOCATION=['cookies'],
+        JWT_COOKIE_CSRF_PROTECT=True,
+        JWT_CSRF_CHECK_FORM=True,
+        JWT_COOKIE_SECURE=False,  # Set to True in production
+        JWT_COOKIE_SAMESITE='Lax',
+        
+        # Session and Cookie Configuration
+        SESSION_COOKIE_SECURE=False,  # Set to True in production
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE='Lax',
+        PERMANENT_SESSION_LIFETIME=timedelta(days=7),
+        
+        # CSRF Configuration
+        WTF_CSRF_ENABLED=True,
+        WTF_CSRF_SECRET_KEY=os.getenv('CSRF_SECRET_KEY', 'dev-csrf-secret'),
+        
+        # Cache Configuration
         CACHE_TYPE='simple',
         CACHE_DEFAULT_TIMEOUT=300,
-        MAX_CONTENT_LENGTH=16 * 1024 * 1024,
-        SESSION_COOKIE_SECURE=False,
-        SESSION_COOKIE_HTTPONLY=True,
-        PERMANENT_SESSION_LIFETIME=timedelta(days=7),
-        WTF_CSRF_ENABLED=True
+        
+        # File Upload Configuration
+        MAX_CONTENT_LENGTH=16 * 1024 * 1024  # 16MB max file size
     )
 
     # Initialize extensions with app
@@ -57,35 +69,45 @@ def create_app():
     CORS(app, supports_credentials=True)
 
     with app.app_context():
-        # Import models first
+        # Import models
         from app.models import user, account, transaction, budget, bill
         
-        # Then import blueprints
+        # Import and register blueprints
         from app.routes import (
-            home, auth, dashboard, accounts, 
+            home, auth, dashboard, accounts,
             transactions, users, investments,
             budgets, bills
         )
 
-        # Register blueprints
         app.register_blueprint(home.home_bp)
         app.register_blueprint(auth.auth_bp)
-        app.register_blueprint(accounts.accounts_bp)
         app.register_blueprint(dashboard.dashboard_bp)
+        app.register_blueprint(accounts.accounts_bp)
         app.register_blueprint(transactions.transactions_bp)
         app.register_blueprint(users.users_bp)
         app.register_blueprint(investments.investments_bp)
         app.register_blueprint(budgets.budgets_bp)
         app.register_blueprint(bills.bills_bp)
 
-        # Create tables
+        # Create database tables
         db.create_all()
         logger.info("Database tables created successfully!")
 
     return app
 
 
+# JWT error handlers
+@jwt.expired_token_loader
+def expired_token_callback(jwt_header, jwt_payload):
+    return redirect(url_for('auth.login_page'))
 
+@jwt.invalid_token_loader
+def invalid_token_callback(error):
+    return redirect(url_for('auth.login_page'))
+
+@jwt.unauthorized_loader
+def missing_token_callback(error):
+    return redirect(url_for('auth.login_page'))
 
 # Authentication blueprint routes and forms
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, make_response, flash

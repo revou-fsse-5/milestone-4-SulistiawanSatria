@@ -221,7 +221,49 @@ document.addEventListener('DOMContentLoaded', function() {
             errorMessage.textContent = error.message || 'An error occurred during registration';
             errorMessage.classList.remove('hidden');
         });
+    });form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const terms = document.getElementById('terms');
+        if (!terms.checked) {
+            errorMessage.textContent = 'Please accept the Terms and Conditions';
+            errorMessage.classList.remove('hidden');
+            return;
+        }
+        
+        const formData = new FormData(form);
+        
+        fetch('{{ url_for("auth.register_page") }}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            if (response.redirected) {
+                window.location.href = response.url;
+                return;
+            }
+            
+            if (response.headers.get('content-type')?.includes('application/json')) {
+                return response.json().then(data => {
+                    if (data.status === 'error') {
+                        throw new Error(data.message);
+                    }
+                    window.location.href = '{{ url_for("auth.login_page") }}';
+                });
+            } else {
+                window.location.href = '{{ url_for("auth.login_page") }}';
+            }
+        })
+        .catch(error => {
+            errorMessage.textContent = error.message || 'An error occurred during registration';
+            errorMessage.classList.remove('hidden');
+        });
     });
+    
 });
 </script>
 {% endblock %}

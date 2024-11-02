@@ -4,24 +4,29 @@ FROM python:3.9-slim
 # Tentukan direktori kerja di dalam container
 WORKDIR /app
 
-# Install dependencies yang dibutuhkan oleh mysqlclient
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     default-libmysqlclient-dev \
     build-essential \
+    pkg-config \
+    python3-dev \
+    gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Salin file requirements.txt ke dalam container
+# Perbarui pip ke versi terbaru
+RUN pip install --upgrade pip setuptools wheel
+
+# Salin requirements.txt terlebih dahulu
 COPY requirements.txt .
 
-# Install dependencies dari requirements.txt
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Salin seluruh proyek ke dalam direktori kerja
+# Salin seluruh proyek
 COPY . .
 
 # Tentukan port yang akan diekspos
 EXPOSE 8000
 
 # Tentukan command untuk menjalankan aplikasi
-CMD ["flask", "run", "--host=0.0.0.0", "--port=8000"]
-
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "run:app"]

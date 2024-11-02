@@ -1,0 +1,12 @@
+name: your-app-name
+services:
+  - name: web
+    instance_type: nano
+    ports:
+      - port: 8000
+        protocol: http
+    env:
+      - key: FLASK_ENV
+        value: production
+    build:
+      dockerfile: Dockerfile

@@ -1,5 +1,5 @@
-# Gunakan image Python sebagai dasar
-FROM python:3.9-slim
+# Gunakan versi Python yang lebih spesifik dan stabil
+FROM python:3.9.18-slim
 
 # Tentukan direktori kerja di dalam container
 WORKDIR /app
@@ -13,16 +13,16 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Perbarui pip ke versi terbaru
-RUN pip install --upgrade pip setuptools wheel
+# Set versi pip yang spesifik untuk menghindari konflik
+RUN pip install pip==23.0.1
 
 # Salin requirements.txt terlebih dahulu
 COPY requirements.txt .
 
-# Install dependencies
+# Install dependencies dengan versi pip yang sudah ditentukan
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Salin seluruh proyek
+# Salin seluruh aplikasi ke /app
 COPY . .
 
 # Tentukan port yang akan diekspos

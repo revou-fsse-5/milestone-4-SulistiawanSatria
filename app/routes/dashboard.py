@@ -17,37 +17,6 @@ logger = logging.getLogger(__name__)
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
-def format_transaction_data(transaction, include_accounts=True):
-    try:
-        from_account = Account.query.get(transaction.from_account_id) if transaction.from_account_id else None
-        to_account = Account.query.get(transaction.to_account_id) if transaction.to_account_id else None
-        
-        data = {
-            'id': transaction.id,
-            'type': transaction.type,
-            'amount': float(transaction.amount),
-            'description': transaction.description,
-            'created_at': transaction.created_at,
-            'status': transaction.status
-        }
-        
-        if include_accounts:
-            data.update({
-                'from_account': {
-                    'number': from_account.account_number if from_account else None,
-                    'type': from_account.account_type if from_account else None
-                } if from_account else None,
-                'to_account': {
-                    'number': to_account.account_number if to_account else None,
-                    'type': to_account.account_type if to_account else None
-                } if to_account else None
-            })
-            
-        return data
-    except Exception as e:
-        logger.error(f"Error formatting transaction data: {str(e)}")
-        return None
-
 @dashboard_bp.route('/')
 @dashboard_bp.route('/dashboard')
 @jwt_required()
@@ -63,60 +32,48 @@ def index():
         template_data = {
             'user': user,
             'current_user': user,
-            'total_balance': 0.00,
-            'monthly_income': 0.00,
-            'monthly_expenses': 0.00,
+            'is_authenticated': True,
+            'total_balance': Decimal('0.00'),
+            'monthly_income': Decimal('0.00'),
+            'monthly_expenses': Decimal('0.00'),
             'account_count': 0,
             'accounts': [],
             'recent_transactions': [],
             'budgets': []
         }
 
+        verify_jwt_in_request()
+
         accounts = Account.query.filter_by(user_id=current_user_id).all()
         if accounts:
             template_data['accounts'] = accounts
             template_data['account_count'] = len(accounts)
-            template_data['total_balance'] = sum(float(account.balance) for account in accounts)
+            template_data['total_balance'] = sum(Decimal(str(account.balance)) for account in accounts)
 
-        account_ids = [account.id for account in accounts]
-        if account_ids:
+            account_ids = [account.id for account in accounts]
             transactions = Transaction.query.filter(
                 (Transaction.from_account_id.in_(account_ids)) |
                 (Transaction.to_account_id.in_(account_ids))
             ).order_by(Transaction.created_at.desc()).limit(5).all()
             
-            template_data['recent_transactions'] = transactions
+            template_data['recent_transactions'] = [{
+                'id': t.id,
+                'from_account_id': t.from_account_id,
+                'to_account_id': t.to_account_id,
+                'type': t.type,
+                'amount': float(t.amount),
+                'description': t.description,
+                'status': t.status,
+                'created_at': t.created_at,
+                'updated_at': t.updated_at
+            } for t in transactions]
 
         return render_template('dashboard/index.html', **template_data)
-
+        
     except Exception as e:
         logger.error(f"Dashboard error: {str(e)}")
-        flash('Error loading dashboard', 'error')
+        flash('Session expired, please login again', 'error')
         return redirect(url_for('auth.login_page'))
-
-@dashboard_bp.route('/dashboard/account/<int:account_id>')
-@jwt_required()
-@check_account_ownership
-def account_details(account_id):
-    try:
-        account = Account.query.get_or_404(account_id)
-        
-        transactions = Transaction.query.filter(
-            (Transaction.from_account_id == account_id) |
-            (Transaction.to_account_id == account_id)
-        ).order_by(Transaction.created_at.desc()).limit(10).all()
-
-        transactions_data = [format_transaction_data(t, include_accounts=False)
-                           for t in transactions]
-
-        return render_template('dashboard/account_details.html',
-                               account=account,
-                               transactions=transactions_data)
-
-    except Exception as e:
-        logger.error(f"Account details error: {str(e)}")
-        flash('Error loading account details', 'error')
-        return redirect(url_for('dashboard.index'))
 
 @dashboard_bp.route('/dashboard/analytics')
 @jwt_required()
@@ -124,15 +81,19 @@ def analytics():
     try:
         current_user_id = get_jwt_identity()
         accounts = Account.query.filter_by(user_id=current_user_id).all()
-        account_ids = [account.id for account in accounts]
+        
+        if not accounts:
+            flash('No accounts found', 'warning')
+            return redirect(url_for('dashboard.index'))
 
+        account_ids = [account.id for account in accounts]
         transactions = Transaction.query.filter(
             (Transaction.from_account_id.in_(account_ids)) |
             (Transaction.to_account_id.in_(account_ids))
         ).order_by(Transaction.created_at.desc()).all()
 
-        total_inflow = sum(float(t.amount) for t in transactions if t.to_account_id in account_ids)
-        total_outflow = sum(float(t.amount) for t in transactions if t.from_account_id in account_ids)
+        total_inflow = sum(Decimal(str(t.amount)) for t in transactions if t.to_account_id in account_ids)
+        total_outflow = sum(Decimal(str(t.amount)) for t in transactions if t.from_account_id in account_ids)
         
         type_distribution = {}
         for t in transactions:
@@ -142,11 +103,12 @@ def analytics():
                 type_distribution[t.type] = 1
 
         return render_template('dashboard/analytics.html',
-                            total_inflow=total_inflow,
-                            total_outflow=total_outflow,
-                            net_flow=total_inflow - total_outflow,
-                            type_distribution=type_distribution,
-                            current_user=User.query.get(current_user_id))
+                           total_inflow=float(total_inflow),
+                           total_outflow=float(total_outflow),
+                           net_flow=float(total_inflow - total_outflow),
+                           type_distribution=type_distribution,
+                           current_user=User.query.get(current_user_id),
+                           is_authenticated=True)
 
     except Exception as e:
         logger.error(f"Analytics error: {str(e)}")

@@ -1,5 +1,4 @@
-from flask import Blueprint, render_template, request
-from flask import Blueprint, render_template, request, jsonify, make_response
+from flask import Blueprint, render_template, request, jsonify, make_response, flash, redirect, url_for
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models.transaction import Transaction
 from app.models.account import Account
@@ -7,14 +6,24 @@ from app.models.transaction_category import TransactionCategory
 from app.extensions import db
 from datetime import datetime, timedelta
 from sqlalchemy import or_
+import logging
 
+logger = logging.getLogger(__name__)
 transactions_bp = Blueprint('transactions', __name__, url_prefix='/transactions')
 
+# Form class
+from flask_wtf import FlaskForm
+from wtforms import SelectField, StringField, FloatField, TextAreaField
+from wtforms.validators import DataRequired, NumberRange
+
+class TransactionForm(FlaskForm):
+    from_account_id = SelectField('From Account', coerce=int, validators=[DataRequired()])
+    to_account_id = StringField('To Account', validators=[DataRequired()])
+    amount = FloatField('Amount', validators=[DataRequired(), NumberRange(min=0.01)])
+    description = TextAreaField('Description')
+
 def validate_account_ownership(account_id, user_id):
-    """Validate account ownership"""
     account = Account.query.filter_by(id=account_id, user_id=user_id).first()
-    if not account:
-        return None
     return account
 
 @transactions_bp.route('/', methods=['GET'])
@@ -25,20 +34,9 @@ def list_transactions():
         accounts = Account.query.filter_by(user_id=current_user_id).all()
         account_ids = [account.id for account in accounts]
         
-        # Pagination parameters
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         
-        # Filter parameters
-        start_date = request.args.get('start_date')
-        end_date = request.args.get('end_date')
-        transaction_type = request.args.get('type')
-        min_amount = request.args.get('min_amount')
-        max_amount = request.args.get('max_amount')
-        category_id = request.args.get('category_id')
-        account_id = request.args.get('account_id')
-        
-        # Base query
         query = Transaction.query.filter(
             or_(
                 Transaction.from_account_id.in_(account_ids),
@@ -46,32 +44,9 @@ def list_transactions():
             )
         )
         
-        # Apply filters
-        if start_date:
-            query = query.filter(Transaction.created_at >= datetime.strptime(start_date, '%Y-%m-%d'))
-        if end_date:
-            query = query.filter(Transaction.created_at <= datetime.strptime(end_date, '%Y-%m-%d'))
-        if transaction_type:
-            query = query.filter(Transaction.type == transaction_type)
-        if min_amount:
-            query = query.filter(Transaction.amount >= float(min_amount))
-        if max_amount:
-            query = query.filter(Transaction.amount <= float(max_amount))
-        if category_id:
-            query = query.filter(Transaction.category_id == category_id)
-        if account_id:
-            query = query.filter(
-                or_(
-                    Transaction.from_account_id == account_id,
-                    Transaction.to_account_id == account_id
-                )
-            )
-        
-        # Execute paginated query
         paginated_transactions = query.order_by(Transaction.created_at.desc())\
                                     .paginate(page=page, per_page=per_page)
         
-        # Format transactions for template
         transactions = [{
             "id": t.id,
             "type": t.type,
@@ -80,11 +55,9 @@ def list_transactions():
             "created_at": t.created_at.isoformat(),
             "from_account_id": t.from_account_id,
             "to_account_id": t.to_account_id,
-            "category": t.category.name if t.category else None,
             "status": t.status
         } for t in paginated_transactions.items]
         
-        # Format pagination info
         pagination = {
             "total_items": paginated_transactions.total,
             "total_pages": paginated_transactions.pages,
@@ -94,11 +67,67 @@ def list_transactions():
             "has_prev": paginated_transactions.has_prev
         }
         
-        return render_template('transactions/list.html', transactions=transactions, pagination=pagination)
-        
+        return render_template('transactions/list.html',
+                             transactions=transactions,
+                             pagination=pagination,
+                             is_authenticated=True)
     except Exception as e:
-        print("Error:", str(e))
+        logger.error(f"Error fetching transactions: {str(e)}")
         return render_template('error/500.html', error="Internal server error"), 500
+
+@transactions_bp.route('/create', methods=['GET', 'POST'])
+@jwt_required()
+def create_transaction():
+    form = TransactionForm()
+    current_user_id = get_jwt_identity()
+    
+    try:
+        accounts = Account.query.filter_by(user_id=current_user_id).all()
+        form.from_account_id.choices = [(acc.id, f"{acc.account_number}") for acc in accounts]
+        
+        if request.method == 'POST' and form.validate_on_submit():
+            from_account = validate_account_ownership(form.from_account_id.data, current_user_id)
+            if not from_account:
+                flash('Invalid source account', 'error')
+                return render_template('transactions/create.html', form=form)
+
+            if from_account.balance < form.amount.data:
+                flash('Insufficient balance', 'error')
+                return render_template('transactions/create.html', form=form)
+
+            to_account = Account.query.filter_by(account_number=form.to_account_id.data).first()
+            if not to_account:
+                flash('Destination account not found', 'error')
+                return render_template('transactions/create.html', form=form)
+
+            transaction = Transaction(
+                from_account_id=from_account.id,
+                to_account_id=to_account.id,
+                amount=form.amount.data,
+                description=form.description.data,
+                type='transfer',
+                status='completed'
+            )
+
+            from_account.balance -= form.amount.data
+            to_account.balance += form.amount.data
+
+            db.session.add(transaction)
+            db.session.commit()
+
+            flash('Transaction created successfully', 'success')
+            return redirect(url_for('transactions.list_transactions'))
+
+        return render_template('transactions/create.html',
+                             form=form,
+                             accounts=accounts,
+                             is_authenticated=True)
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error creating transaction: {str(e)}")
+        flash('An error occurred while creating transaction', 'error')
+        return render_template('transactions/create.html', form=form)
 
 @transactions_bp.route('/deposit', methods=['POST'])
 @jwt_required()
@@ -107,7 +136,6 @@ def create_deposit():
         data = request.get_json()
         user_id = get_jwt_identity()
         
-        # Validasi input
         required_fields = ['account_id', 'amount']
         for field in required_fields:
             if field not in data:
@@ -119,23 +147,19 @@ def create_deposit():
         if amount <= 0:
             return jsonify({"error": "Amount must be positive"}), 400
 
-        # Validasi account ownership
         account = validate_account_ownership(account_id, user_id)
         if not account:
             return jsonify({"error": "Account not found"}), 404
         
-        # Create transaction with category
         transaction = Transaction(
             from_account_id=None,
             to_account_id=account_id,
             amount=amount,
             type='deposit',
             description=data.get('description', 'Deposit'),
-            category_id=data.get('category_id'),
             status='completed'
         )
 
-        # Update account balance
         account.balance += amount
         
         db.session.add(transaction)
@@ -159,7 +183,7 @@ def create_deposit():
         
     except Exception as e:
         db.session.rollback()
-        print("Error:", str(e))
+        logger.error(f"Error creating deposit: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
 @transactions_bp.route('/withdraw', methods=['POST'])
@@ -169,7 +193,6 @@ def create_withdraw():
         data = request.get_json()
         user_id = get_jwt_identity()
         
-        # Validasi input
         required_fields = ['account_id', 'amount']
         for field in required_fields:
             if field not in data:
@@ -181,27 +204,22 @@ def create_withdraw():
         if amount <= 0:
             return jsonify({"error": "Amount must be positive"}), 400
 
-        # Validasi account ownership
         account = validate_account_ownership(account_id, user_id)
         if not account:
             return jsonify({"error": "Account not found"}), 404
         
-        # Check sufficient balance
         if account.balance < amount:
             return jsonify({"error": "Insufficient balance"}), 400
         
-        # Create transaction
         transaction = Transaction(
             from_account_id=account_id,
             to_account_id=None,
             amount=amount,
             type='withdraw',
             description=data.get('description', 'Withdrawal'),
-            category_id=data.get('category_id'),
             status='completed'
         )
 
-        # Update account balance
         account.balance -= amount
         
         db.session.add(transaction)
@@ -225,7 +243,7 @@ def create_withdraw():
         
     except Exception as e:
         db.session.rollback()
-        print("Error:", str(e))
+        logger.error(f"Error creating withdrawal: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
 @transactions_bp.route('/transfer', methods=['POST'])
@@ -235,7 +253,6 @@ def create_transfer():
         data = request.get_json()
         user_id = get_jwt_identity()
         
-        # Validasi input
         required_fields = ['from_account_id', 'to_account_id', 'amount']
         for field in required_fields:
             if field not in data:
@@ -248,32 +265,26 @@ def create_transfer():
         if amount <= 0:
             return jsonify({"error": "Amount must be positive"}), 400
         
-        # Validate source account ownership
         from_account = validate_account_ownership(from_account_id, user_id)
         if not from_account:
             return jsonify({"error": "Source account not found"}), 404
         
-        # Validate destination account
         to_account = Account.query.get(to_account_id)
         if not to_account:
             return jsonify({"error": "Destination account not found"}), 404
         
-        # Check sufficient balance
         if from_account.balance < amount:
             return jsonify({"error": "Insufficient balance"}), 400
         
-        # Create transaction
         transaction = Transaction(
             from_account_id=from_account_id,
             to_account_id=to_account_id,
             amount=amount,
             type='transfer',
             description=data.get('description', 'Transfer'),
-            category_id=data.get('category_id'),
             status='completed'
         )
 
-        # Update account balances
         from_account.balance -= amount
         to_account.balance += amount
         
@@ -289,57 +300,12 @@ def create_transfer():
                 "description": transaction.description,
                 "created_at": transaction.created_at.isoformat(),
                 "status": transaction.status
-            },
-            "from_account": {
-                "id": from_account.id,
-                "balance": float(from_account.balance)
-            },
-            "to_account": {
-                "id": to_account.id,
-                "balance": float(to_account.balance)
             }
         }), 201
         
     except Exception as e:
         db.session.rollback()
-        print("Error:", str(e))
-        return jsonify({"error": "Internal server error"}), 500
-
-@transactions_bp.route('/<int:transaction_id>', methods=['GET'])
-@jwt_required()
-def get_transaction(transaction_id):
-    try:
-        current_user_id = 1 
-        accounts = Account.query.filter_by(user_id=current_user_id).all()
-        account_ids = [account.id for account in accounts]
-        
-        transaction = Transaction.query.filter(
-            Transaction.id == transaction_id,
-            or_(
-                Transaction.from_account_id.in_(account_ids),
-                Transaction.to_account_id.in_(account_ids)
-            )
-        ).first()
-        
-        if not transaction:
-            return jsonify({"error": "Transaction not found"}), 404
-        
-        return jsonify({
-            "transaction": {
-                "id": transaction.id,
-                "type": transaction.type,
-                "amount": float(transaction.amount),
-                "description": transaction.description,
-                "created_at": transaction.created_at.isoformat(),
-                "from_account_id": transaction.from_account_id,
-                "to_account_id": transaction.to_account_id,
-                "category": transaction.category.name if transaction.category else None,
-                "status": transaction.status
-            }
-        }), 200
-        
-    except Exception as e:
-        print("Error:", str(e))
+        logger.error(f"Error creating transfer: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
 @transactions_bp.route('/categories', methods=['GET'])
@@ -537,26 +503,9 @@ def get_transaction_summary():
         print("Error:", str(e))
         return jsonify({"error": "Internal server error"}), 500
 
-@transactions_bp.route('/create', methods=['GET', 'POST'])
-@jwt_required()
-def create_transaction():
-    if request.method == 'POST':
-        data = request.form
-        try:
-            transaction = Transaction(
-                from_account_id=data.get('from_account_id'),
-                to_account_id=data.get('to_account_id'),
-                amount=data.get('amount'),
-                transaction_type=data.get('transaction_type'),
-                description=data.get('description')
-            )
-            db.session.add(transaction)
-            db.session.commit()
-            return jsonify({'message': 'Transaction created successfully'}), 201
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'error': str(e)}), 400
     
     # GET method - render transaction form
     accounts = Account.query.all()
-    return render_template('transactions/create.html', accounts=accounts)
+    return render_template('transactions/create.html', 
+                accounts=accounts,
+                is_authenticated=True)

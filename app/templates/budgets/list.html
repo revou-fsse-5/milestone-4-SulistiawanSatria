@@ -1,21 +1,59 @@
 {% extends "base.html" %}
-
-{% block title %}Budgets - Modern Bank{% endblock %}
-
 {% block main_content %}
-<div class="bg-white rounded-lg shadow p-6">
+<div class="container mx-auto px-4">
     <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold">My Budgets</h2>
-        <a href="{{ url_for('budgets.create_budget_page') }}" 
-           class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-            Create Budget
+        <h1 class="text-2xl font-bold text-gray-800">Budget Management</h1>
+        <a href="{{ url_for('budgets.create_budget_page') }}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+            Create New Budget
         </a>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {% for budget in budgets %}
-        <!-- Budget cards content remains the same -->
-        {% endfor %}
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Period</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for budget in budgets %}
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap">{{ budget.name }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${{ "%.2f"|format(budget.amount) }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {{ budget.start_date.strftime('%Y-%m-%d') }} to {{ budget.end_date.strftime('%Y-%m-%d') }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button onclick="editBudget({{ budget.id }})" class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</button>
+                        <button onclick="deleteBudget({{ budget.id }})" class="text-red-600 hover:text-red-900">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
+
+<script>
+function deleteBudget(budgetId) {
+    if (confirm('Are you sure you want to delete this budget?')) {
+        fetch(`/budgets/${budgetId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.message) {
+                location.reload();
+            }
+        });
+    }
+}
+</script>
 {% endblock %}

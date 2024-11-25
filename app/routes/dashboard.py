@@ -17,18 +17,17 @@ logger = logging.getLogger(__name__)
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
-@dashboard_bp.route('/')
 @dashboard_bp.route('/dashboard')
 @jwt_required()
 def index():
     try:
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
-        
+       
         if not user:
             flash('User not found', 'error')
             return redirect(url_for('auth.login_page'))
-            
+           
         template_data = {
             'user': user,
             'current_user': user,
@@ -41,6 +40,7 @@ def index():
             'recent_transactions': [],
             'budgets': []
         }
+
 
         verify_jwt_in_request()
 

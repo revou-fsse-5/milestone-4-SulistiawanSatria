@@ -1,6 +1,5 @@
-from flask import Blueprint, request, jsonify, render_template, redirect, url_for, make_response, flash, current_app
+from flask import Blueprint, jsonify, render_template, redirect, url_for, make_response, flash
 from flask_jwt_extended import create_access_token, verify_jwt_in_request, get_jwt_identity
-from werkzeug.security import check_password_hash
 from app.models.user import User
 from app.extensions import db
 from datetime import timedelta
@@ -50,6 +49,7 @@ def register_page():
     except:
         form = RegistrationForm()
         return render_template('auth/register.html', form=form)
+    
 
 @auth_bp.route('/register', methods=['POST'])
 def register():
@@ -57,8 +57,8 @@ def register():
     
     try:
         if form.validate_on_submit():
-            # Bungkus operasi database dalam try-except
             try:
+                # Create new user
                 user = User(
                     username=form.username.data,
                     email=form.email.data
@@ -69,24 +69,27 @@ def register():
                 db.session.commit()
                 
                 logger.info(f"New user registered: {user.email}")
-                flash('Registration successful! Please login.', 'success')
-                return redirect(url_for('auth.login_page'))
+                return jsonify({
+                    "message": "Registration successful. Please log in.",
+                    "user": {
+                        "id": user.id,
+                        "username": user.username,
+                        "email": user.email
+                    }
+                }), 201
                 
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Database error during registration: {str(e)}")
-                flash('An error occurred during registration. Please try again.', 'error')
+                return jsonify({"error": "An error occurred during registration. Please try again."}), 500
                 
-        # Jika validasi gagal, tampilkan error
-        for field, errors in form.errors.items():
-            for error in errors:
-                flash(f"{field.title()}: {error}", 'error')
-                
+        # Validation errors
+        errors = {field: errors for field, errors in form.errors.items()}
+        return jsonify({"error": "Validation failed", "details": errors}), 400
+        
     except Exception as e:
         logger.error(f"Error during registration process: {str(e)}")
-        flash('An unexpected error occurred. Please try again.', 'error')
-    
-    return render_template('auth/register.html', form=form)
+        return jsonify({"error": "An unexpected error occurred. Please try again."}), 500
 
 @auth_bp.route('/login', methods=['GET'])
 def login_page():
@@ -96,6 +99,7 @@ def login_page():
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
+    # return jsonify({"msg":"test"}), 200
     form = LoginForm()
     
     try:
@@ -104,42 +108,34 @@ def login():
                 user = User.query.filter_by(email=form.email.data).first()
                 
                 if user and user.check_password(form.password.data):
+                    # Generate JWT access token
                     access_token = create_access_token(
-                        identity=user.id,
+                        identity=str(user.id),
                         fresh=True,
                         expires_delta=timedelta(hours=1)
                     )
                     
-                    response = make_response(redirect(url_for('dashboard.index')))
-                    response.set_cookie(
-                        'access_token_cookie',
-                        value=access_token,
-                        max_age=3600,
-                        httponly=True,
-                        secure=False,
-                        samesite='Lax'
-                    )
-                    
                     logger.info(f"User logged in: {user.email}")
-                    flash('Login successful!', 'success')
-                    return response
+                    return jsonify({
+                        "message": "Login successful",
+                        "access_token": access_token,
+                        "token_type": "Bearer"
+                    }), 200
                 
-                flash('Invalid email or password', 'error')
+                return jsonify({"error": "Invalid email or password"}), 401
                 
             except Exception as e:
                 logger.error(f"Database error during login: {str(e)}")
-                flash('An error occurred during login. Please try again.', 'error')
+                return jsonify({"error": "An error occurred during login. Please try again."}), 500
                 
-        # Jika validasi gagal, tampilkan error
-        for field, errors in form.errors.items():
-            for error in errors:
-                flash(f"{field.title()}: {error}", 'error')
-                
+        # Return validation errors
+        errors = {field: errors for field, errors in form.errors.items()}
+        return jsonify({"error": "Validation failed", "details": errors}), 400
+        
     except Exception as e:
         logger.error(f"Error during login process: {str(e)}")
-        flash('An unexpected error occurred. Please try again.', 'error')
+        return jsonify({"error": "An unexpected error occurred. Please try again."}), 500
     
-    return render_template('auth/login.html', form=form)
 
 @auth_bp.route('/logout', methods=['GET', 'POST'])
 def logout():
@@ -157,6 +153,7 @@ def logout():
 def verify_token():
     try:
         verify_jwt_in_request()
+        print("asdf")
         current_user_id = get_jwt_identity()
         
         user = User.query.get(current_user_id)

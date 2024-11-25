@@ -14,9 +14,10 @@
             <div class="flex justify-between h-16">
                 <!-- Logo and Brand -->
                 <div class="flex-shrink-0 flex items-center">
-                    <a href="{{ url_for('dashboard.index') }}" class="text-2xl font-bold text-indigo-600">
+                    <a href="{% if is_authenticated %}{{ url_for('dashboard.index') }}{% else %}{{ url_for('home.index') }}{% endif %}" class="text-2xl font-bold text-indigo-600">
                         Modern Bank
                     </a>
+                    
                 <!-- Desktop Navigation -->
                 <div class="hidden md:ml-6 md:flex md:items-center">
                     {% if is_authenticated %}
@@ -32,6 +33,14 @@
                             <a href="{{ url_for('transactions.create_transaction') }}"
                                class="px-3 py-2 rounded-md text-sm font-medium {% if 'transactions' in request.endpoint %}text-indigo-600 bg-indigo-50{% else %}text-gray-700 hover:text-gray-900 hover:bg-gray-50{% endif %}">
                                 Transactions
+                            </a>
+                            <a href="{{ url_for('bills.list_bills') }}"
+                               class="px-3 py-2 rounded-md text-sm font-medium {% if 'bills' in request.endpoint %}text-indigo-600 bg-indigo-50{% else %}text-gray-700 hover:text-gray-900 hover:bg-gray-50{% endif %}">
+                                Bills
+                            </a>
+                            <a href="{{ url_for('budgets.list_budgets') }}"
+                               class="px-3 py-2 rounded-md text-sm font-medium {% if 'budgets' in request.endpoint %}text-indigo-600 bg-indigo-50{% else %}text-gray-700 hover:text-gray-900 hover:bg-gray-50{% endif %}">
+                                Budgets
                             </a>
 
                             <!-- Logout Button -->
@@ -78,6 +87,12 @@
                     </a>
                     <a href="{{ url_for('transactions.create_transaction')}}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
                         Transactions
+                    </a>
+                    <a href="{{ url_for('bills.list_bills') }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
+                        Bills
+                    </a>
+                    <a href="{{ url_for('budgets.list_budgets') }}" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50">
+                        Budgets
                     </a>
                     <form action="{{ url_for('auth.logout') }}" method="POST">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />

@@ -1,17 +1,85 @@
 {% extends "base.html" %}
-
 {% block title %}Schedule New Bill - Modern Bank{% endblock %}
-
 {% block main_content %}
 <div class="container mx-auto px-4">
     <div class="max-w-2xl mx-auto">
         <h1 class="text-2xl font-bold text-gray-800 mb-6">Schedule New Bill</h1>
         
         <div class="bg-white rounded-lg shadow p-6">
-            <form method="POST" action="{{ url_for('bills.create_bill') }}">
-                <!-- Form content remains the same, just updated action URL -->
+            <form method="POST" action="{{ url_for('bills.create_bill_page') }}">
+                {{ form.csrf_token }}
+                
+        <div class="bg-white rounded-lg shadow p-6">
+            <form id="billForm" onsubmit="submitBill(event)">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Biller Name</label>
+                    <input type="text" name="biller_name" required 
+                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Amount ($)</label>
+                    <input type="number" name="amount" step="0.01" required
+                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Due Date</label>
+                    <input type="date" name="due_date" required
+                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Select Account</label>
+                    <select name="account_id" required
+                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        {% for account in accounts %}
+                        <option value="{{ account.id }}">{{ account.account_type }} (*{{ account.account_number[-4:] }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <a href="{{ url_for('bills.list_bills') }}"
+                        class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                        Cancel
+                    </a>
+                    <button type="submit"
+                        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                        Schedule Bill
+                    </button>
+                </div>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+function submitBill(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    fetch('/bills/api/create', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            biller_name: formData.get('biller_name'),
+            amount: parseFloat(formData.get('amount')),
+            due_date: formData.get('due_date'),
+            account_id: parseInt(formData.get('account_id'))
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            window.location.href = "{{ url_for('bills.list_bills') }}";
+        } else {
+            alert('Error creating bill');
+        }
+    });
+}
+</script>
 {% endblock %}

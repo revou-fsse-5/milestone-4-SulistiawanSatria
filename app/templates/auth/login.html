@@ -98,7 +98,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('loginForm');
     const errorMessage = document.getElementById('errorMessage');
@@ -136,6 +136,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.status === 'error') {
                         throw new Error(data.message);
                     }
+
+                    // Jika ada token dalam response, simpan ke localStorage
+                    console.log(data.token)
+                    
+                    if (data.token) {
+                        localStorage.setItem('authToken', data.token);
+                    }
+
+                    // Alihkan ke halaman yang sesuai
                     window.location.href = data.redirect || '{{ url_for("dashboard.index") }}';
                 });
             } else {
@@ -148,5 +157,5 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
-</script>
+
 {% endblock %}

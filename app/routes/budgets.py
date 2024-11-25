@@ -1,22 +1,56 @@
-from flask import Blueprint, request, jsonify, render_template
+from flask import Blueprint, request, jsonify, render_template, redirect, url_for
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models.budget import Budget
 from app.extensions import db
 from datetime import datetime
 import logging
+from flask_wtf import FlaskForm
+from wtforms import StringField, DecimalField, DateField
+from wtforms.validators import DataRequired
+
+class BudgetForm(FlaskForm):
+    name = StringField('Budget Name', validators=[DataRequired()])
+    amount = DecimalField('Amount', validators=[DataRequired()])
+    start_date = DateField('Start Date', validators=[DataRequired()])
+    end_date = DateField('End Date', validators=[DataRequired()])
 
 budgets_bp = Blueprint('budgets', __name__, url_prefix='/budgets')
 logger = logging.getLogger(__name__)
 
-@budgets_bp.route('/create', methods=['GET'])
+@budgets_bp.route('/create', methods=['POST'])
 @jwt_required()
 def create_budget_page():
-    return render_template('budgets/create.html')
+    form = BudgetForm()
+    if form.validate_on_submit():
+        budget = Budget(
+            user_id=get_jwt_identity(),
+            name=form.name.data,
+            amount=form.amount.data,
+            start_date=form.start_date.data,
+            end_date=form.end_date.data
+        )
+        db.session.add(budget)
+        db.session.commit()
+        return jsonify({budget: budget.name}), 200
+        return redirect(url_for('budgets.list_budgets'))
+    
+    return jsonify({"error": "failed to create budget - form not filled"}), 400
+    return render_template('budgets/create.html', form=form)
 
 @budgets_bp.route('/', methods=['GET'])
 @jwt_required()
 def list_budgets():
     budgets = Budget.query.filter_by(user_id=get_jwt_identity()).all()
+    budgets = [
+        {
+            "id": budget.id,
+            "name": budget.name,
+            "start_date": budget.start_date,
+            "end_date": budget.end_date,
+            "amount": float(budget.amount)
+        } for budget in budgets 
+    ]
+    return jsonify({"budgets": budgets}), 200
     return render_template('budgets/list.html', budgets=budgets)
 
 # API Endpoints
@@ -58,13 +92,6 @@ def create_budget():
         logger.error(f"Error creating budget: {str(e)}")
         db.session.rollback()
         return jsonify({"error": "Internal server error"}), 500
-
-@budgets_bp.route('/', methods=['GET'])
-@jwt_required()
-def get_budgets():
-    try:
-        current_user_id = get_jwt_identity()
-        budgets = Budget.query.filter_by(user_id=current_user_id).all()
 
         return jsonify({
             "budgets": [{

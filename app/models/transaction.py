@@ -3,6 +3,8 @@ from app import db
 from datetime import datetime
 
 class Transaction(db.Model):
+    __tablename__ = 'transactions'  # Tambahkan ini
+    
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     from_account_id = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=True)
@@ -16,3 +18,18 @@ class Transaction(db.Model):
 
     def __repr__(self):
         return f'<Transaction {self.id}>'
+    
+    def to_dict(self):
+        """Convert Transaction object to a dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'from_account_id': self.from_account_id,
+            'to_account_id': self.to_account_id,
+            'type': self.type,
+            'amount': str(self.amount),  # Convert Numeric to string for JSON serialization
+            'description': self.description,
+            'status': self.status,
+            'created_at': self.created_at.isoformat(),  # Convert datetime to ISO string
+            'updated_at': self.updated_at.isoformat()  # Convert datetime to ISO string
+        }

@@ -7,6 +7,7 @@ from app.extensions import db
 from datetime import datetime, timedelta
 from sqlalchemy import or_
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 transactions_bp = Blueprint('transactions', __name__, url_prefix='/transactions')
@@ -66,6 +67,8 @@ def list_transactions():
             "has_next": paginated_transactions.has_next,
             "has_prev": paginated_transactions.has_prev
         }
+
+        return jsonify({"trx": transactions}), 200
         
         return render_template('transactions/list.html',
                              transactions=transactions,
@@ -73,9 +76,51 @@ def list_transactions():
                              is_authenticated=True)
     except Exception as e:
         logger.error(f"Error fetching transactions: {str(e)}")
-        return render_template('error/500.html', error="Internal server error"), 500
+        return jsonify({"error": f"Error fetching transactions: {str(e)}"}), 400
+        # return render_template('error/500.html', error="Internal server error"), 500
 
-@transactions_bp.route('/create', methods=['GET', 'POST'])
+@transactions_bp.route('/<int:transaction_id>', methods=['GET'])
+@jwt_required()
+def get_transaction(transaction_id):
+   try:
+       current_user_id = get_jwt_identity()
+       
+       # Ambil data transaksi
+       transaction = Transaction.query.get(transaction_id)
+       if not transaction:
+           return jsonify({"error": "Transaction not found"}), 404
+       
+       # Validasi kepemilikan transaksi (pengguna harus memiliki akun pengirim atau penerima)
+       from_account = Account.query.get(transaction.from_account_id)
+       to_account = Account.query.get(transaction.to_account_id)
+       
+       if (from_account and from_account.user_id != int(current_user_id)) and \
+          (to_account and to_account.user_id != int(current_user_id)):
+           return jsonify({"error": "Access forbidden - This transaction does not belong to your accounts"}), 403
+           
+       # Format response data sesuai dengan struktur yang ada
+       transaction_data = {
+           "id": transaction.id,
+           "amount": float(transaction.amount),
+           "created_at": transaction.created_at.strftime("%Y-%m-%dT%H:%M:%S"),
+           "description": transaction.description,
+           "from_account_id": transaction.from_account_id,
+           "to_account_id": transaction.to_account_id,
+           "status": transaction.status,
+           "type": transaction.type # atau transaction.transaction_type (sesuaikan dengan nama field di model)
+       }
+       
+       return jsonify({
+           "transaction": transaction_data,
+           "message": "success"
+       }), 200
+
+   except Exception as e:
+       logger.error(f"Error fetching transaction details: {str(e)}")
+       return jsonify({"error": "Internal server error"}), 500
+
+
+@transactions_bp.route('/', methods=['POST'])
 @jwt_required()
 def create_transaction():
     form = TransactionForm()
@@ -88,6 +133,7 @@ def create_transaction():
         if request.method == 'POST' and form.validate_on_submit():
             from_account = validate_account_ownership(form.from_account_id.data, current_user_id)
             if not from_account:
+                return jsonify({"message": "from account is not valid"}), 400
                 flash('Invalid source account', 'error')
                 return render_template('transactions/create.html', form=form)
 
@@ -97,6 +143,7 @@ def create_transaction():
 
             to_account = Account.query.filter_by(account_number=form.to_account_id.data).first()
             if not to_account:
+                return jsonify({"message": "to account is not valid"}), 400
                 flash('Destination account not found', 'error')
                 return render_template('transactions/create.html', form=form)
 
@@ -106,7 +153,8 @@ def create_transaction():
                 amount=form.amount.data,
                 description=form.description.data,
                 type='transfer',
-                status='completed'
+                status='completed',
+                user_id=current_user_id   
             )
 
             from_account.balance -= form.amount.data
@@ -115,9 +163,12 @@ def create_transaction():
             db.session.add(transaction)
             db.session.commit()
 
+            return jsonify({"message": "success to create", "trx": transaction.to_dict()}), 201
+
             flash('Transaction created successfully', 'success')
             return redirect(url_for('transactions.list_transactions'))
 
+        return jsonify({"message": "form not filled properly"}), 400
         return render_template('transactions/create.html',
                              form=form,
                              accounts=accounts,
@@ -125,6 +176,7 @@ def create_transaction():
 
     except Exception as e:
         db.session.rollback()
+        return jsonify({"error": f"Error creating transaction: {str(e)}"}), 400
         logger.error(f"Error creating transaction: {str(e)}")
         flash('An error occurred while creating transaction', 'error')
         return render_template('transactions/create.html', form=form)
@@ -311,18 +363,28 @@ def create_transfer():
 @transactions_bp.route('/categories', methods=['GET'])
 @jwt_required()
 def get_transaction_categories():
-    """Get list of transaction categories"""
     try:
+        current_user_id = get_jwt_identity()
+        
+        # Ambil semua kategori transaksi
         categories = TransactionCategory.query.all()
+        
+        # Format response data
+        categories_data = [{
+            "id": category.id,
+            "name": category.name,
+            "description": category.description,
+            "created_at": category.created_at.strftime("%Y-%m-%dT%H:%M:%S") if category.created_at else None,
+            "updated_at": category.updated_at.strftime("%Y-%m-%dT%H:%M:%S") if category.updated_at else None
+        } for category in categories]
+        
         return jsonify({
-            "categories": [{
-                "id": category.id,
-                "name": category.name,
-                "description": category.description
-            } for category in categories]
+            "categories": categories_data,
+            "message": "success"
         }), 200
+
     except Exception as e:
-        print("Error:", str(e))
+        logger.error(f"Error fetching transaction categories: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
 @transactions_bp.route('/statistics', methods=['GET'])

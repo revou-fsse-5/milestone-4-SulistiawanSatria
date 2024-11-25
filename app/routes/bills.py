@@ -1,30 +1,68 @@
-from flask import Blueprint, request, jsonify, render_template
+from flask import Blueprint, request, jsonify, render_template, redirect, url_for
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models.bill import Bill
 from app.models.account import Account
 from app.extensions import db
 from datetime import datetime
 import logging
+from flask_wtf import FlaskForm
+from wtforms import StringField, DecimalField, DateField, SelectField
+from wtforms.validators import DataRequired
 
 bills_bp = Blueprint('bills', __name__, url_prefix='/bills')
 logger = logging.getLogger(__name__)
 
-@bills_bp.route('/create', methods=['GET'])
+class BillForm(FlaskForm):
+    biller_name = StringField('Biller Name', validators=[DataRequired()])
+    amount = DecimalField('Amount', validators=[DataRequired()])
+    due_date = DateField('Due Date', validators=[DataRequired()])
+    account_id = SelectField('Account', coerce=int, validators=[DataRequired()])
+
+@bills_bp.route('/create', methods=['GET', 'POST'])
 @jwt_required()
-def create_bill_page():
+def create_bill_page():  # Gunakan nama ini konsisten
+    form = BillForm()
     accounts = Account.query.filter_by(user_id=get_jwt_identity()).all()
-    return render_template('bills/create.html', accounts=accounts)
+    form.account_id.choices = [(a.id, f"{a.account_type} (*{a.account_number[-4:]})") for a in accounts]
+    
+    if form.validate_on_submit():
+        bill = Bill(
+            user_id=get_jwt_identity(),
+            biller_name=form.biller_name.data,
+            amount=form.amount.data,
+            due_date=form.due_date.data,
+            account_id=form.account_id.data
+        )
+        db.session.add(bill)
+        db.session.commit()
+        return redirect(url_for('bills.list_bills'))
+        
+    return render_template('bills/create.html', form=form, accounts=accounts)
 
 @bills_bp.route('/', methods=['GET'])
 @jwt_required()
 def list_bills():
     bills = Bill.query.filter_by(user_id=get_jwt_identity()).all()
-    return render_template('bills/list.html', bills=bills)
+    bills = [
+        {
+            "id": b.id,
+            "u_id": b.user_id,
+            "biller_name": b.biller_name,
+            "amount": float(b.amount),
+            "due_date": b.due_date,
+            "accpunt_id": b.account_id,
+            "status": b.status,
+            "desc": b.description
+        }
+        for b in bills
+    ]
+    # return render_template('bills/list.html', bills=bills)
+    return jsonify({"bills": bills, "message": "success"}), 200
 
 # API Endpoints
 @bills_bp.route('/api/create', methods=['POST'])
 @jwt_required()
-def create_bill():
+def create_bill_api():
     try:
         current_user_id = get_jwt_identity()
         data = request.get_json()
